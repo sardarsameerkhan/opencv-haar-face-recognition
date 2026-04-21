@@ -1,0 +1,23 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.so
+.venv/
+venv/
+env/
+
+# OS / Editor
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+
+# Model and runtime artifacts
+models/*.yml
+models/*.json
+data/dataset/*/*.jpg
+data/dataset/*/*.png
+!data/dataset/.gitkeep
+!data/dataset/*/.gitkeep
