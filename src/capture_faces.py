@@ -11,10 +11,31 @@ def safe_person_name(name: str) -> str:
     return "".join(ch for ch in cleaned if ch.isalnum() or ch in {"_", "-"}).lower()
 
 
+def next_sample_index(person_dir: Path, person_slug: str) -> int:
+    existing = sorted(person_dir.glob(f"{person_slug}_*.jpg"))
+    if not existing:
+        return 1
+
+    indices = []
+    for path in existing:
+        stem = path.stem
+        parts = stem.split("_")
+        if parts and parts[-1].isdigit():
+            indices.append(int(parts[-1]))
+
+    return (max(indices) + 1) if indices else 1
+
+
 def capture_faces(person_name: str, num_samples: int = 5, camera_index: int = 0) -> None:
     person_slug = safe_person_name(person_name)
+    if not person_slug:
+        raise ValueError("Name must contain at least one alphanumeric character.")
+    if num_samples <= 0:
+        raise ValueError("--samples must be a positive integer.")
+
     person_dir = DATASET_DIR / person_slug
     person_dir.mkdir(parents=True, exist_ok=True)
+    sample_index = next_sample_index(person_dir, person_slug)
 
     face_cascade = cv2.CascadeClassifier(str(HAAR_CASCADE_FILE))
     if face_cascade.empty():
@@ -31,57 +52,60 @@ def capture_faces(person_name: str, num_samples: int = 5, camera_index: int = 0)
 
     captured = 0
 
-    while captured < num_samples:
-        ok, frame = cap.read()
-        if not ok:
-            print("Failed to read frame from webcam.")
-            continue
-
-        gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
-        faces = face_cascade.detectMultiScale(
-            gray,
-            scaleFactor=SCALE_FACTOR,
-            minNeighbors=MIN_NEIGHBORS,
-            minSize=MIN_FACE_SIZE,
-        )
-
-        display = frame.copy()
-        for (x, y, w, h) in faces:
-            cv2.rectangle(display, (x, y), (x + w, y + h), (0, 255, 0), 2)
-
-        cv2.putText(
-            display,
-            f"Person: {person_slug} | Saved: {captured}/{num_samples}",
-            (10, 30),
-            cv2.FONT_HERSHEY_SIMPLEX,
-            0.7,
-            (0, 255, 255),
-            2,
-        )
-
-        cv2.imshow("Face Registration (Press SPACE to capture)", display)
-        key = cv2.waitKey(1) & 0xFF
-
-        if key == ord("q"):
-            break
-
-        if key == 32:  # Space key
-            if len(faces) == 0:
-                print("No face detected. Try again.")
+    try:
+        while captured < num_samples:
+            ok, frame = cap.read()
+            if not ok:
+                print("Failed to read frame from webcam.")
                 continue
 
-            # Use the largest detected face when multiple are present.
-            x, y, w, h = max(faces, key=lambda f: f[2] * f[3])
-            face_roi = gray[y : y + h, x : x + w]
-            face_resized = cv2.resize(face_roi, (200, 200))
+            gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+            faces = face_cascade.detectMultiScale(
+                gray,
+                scaleFactor=SCALE_FACTOR,
+                minNeighbors=MIN_NEIGHBORS,
+                minSize=MIN_FACE_SIZE,
+            )
 
-            output_file = person_dir / f"{person_slug}_{captured + 1:02d}.jpg"
-            cv2.imwrite(str(output_file), face_resized)
-            captured += 1
-            print(f"Saved sample {captured}/{num_samples}: {output_file}")
+            display = frame.copy()
+            for (x, y, w, h) in faces:
+                cv2.rectangle(display, (x, y), (x + w, y + h), (0, 255, 0), 2)
 
-    cap.release()
-    cv2.destroyAllWindows()
+            cv2.putText(
+                display,
+                f"Person: {person_slug} | Saved: {captured}/{num_samples}",
+                (10, 30),
+                cv2.FONT_HERSHEY_SIMPLEX,
+                0.7,
+                (0, 255, 255),
+                2,
+            )
+
+            cv2.imshow("Face Registration (Press SPACE to capture)", display)
+            key = cv2.waitKey(1) & 0xFF
+
+            if key == ord("q"):
+                break
+
+            if key == 32:  # Space key
+                if len(faces) == 0:
+                    print("No face detected. Try again.")
+                    continue
+
+                # Use the largest detected face when multiple are present.
+                x, y, w, h = max(faces, key=lambda f: f[2] * f[3])
+                face_roi = gray[y : y + h, x : x + w]
+                face_resized = cv2.resize(face_roi, (200, 200))
+
+                output_file = person_dir / f"{person_slug}_{sample_index:02d}.jpg"
+                cv2.imwrite(str(output_file), face_resized)
+                sample_index += 1
+                captured += 1
+                print(f"Saved sample {captured}/{num_samples}: {output_file}")
+    finally:
+        cap.release()
+        cv2.destroyAllWindows()
+
     print(f"\nDone. Collected {captured} sample(s) for '{person_slug}'.")
 
 

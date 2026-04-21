@@ -1,5 +1,6 @@
 import json
 from pathlib import Path
+from typing import Dict, List, Tuple
 
 import cv2
 import numpy as np
@@ -7,10 +8,10 @@ import numpy as np
 from config import DATASET_DIR, LABELS_FILE, MODEL_FILE, MODELS_DIR
 
 
-def collect_training_data(dataset_dir: Path):
-    faces = []
-    labels = []
-    label_to_name = {}
+def collect_training_data(dataset_dir: Path) -> Tuple[List[np.ndarray], np.ndarray, Dict[int, str]]:
+    faces: List[np.ndarray] = []
+    labels: List[int] = []
+    label_to_name: Dict[int, str] = {}
 
     person_dirs = sorted([p for p in dataset_dir.iterdir() if p.is_dir()])
     for label_id, person_dir in enumerate(person_dirs):
@@ -37,6 +38,10 @@ def train_model() -> None:
     faces, labels, label_to_name = collect_training_data(DATASET_DIR)
     if len(faces) == 0:
         raise RuntimeError("No training images found. Capture face samples first.")
+    if len(label_to_name) < 2:
+        raise RuntimeError("At least 2 people are required for recognition. Capture data for another person.")
+    if not hasattr(cv2, "face"):
+        raise RuntimeError("OpenCV face module is missing. Install opencv-contrib-python.")
 
     recognizer = cv2.face.LBPHFaceRecognizer_create()
     recognizer.train(faces, labels)
@@ -48,6 +53,8 @@ def train_model() -> None:
         json.dump(label_to_name, f, indent=2)
 
     print("Training complete.")
+    print(f"Classes: {', '.join(label_to_name.values())}")
+    print(f"Total samples used: {len(faces)}")
     print(f"Model saved to: {MODEL_FILE}")
     print(f"Labels saved to: {LABELS_FILE}")
 

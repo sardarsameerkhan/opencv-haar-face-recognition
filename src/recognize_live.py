@@ -20,6 +20,8 @@ def load_labels():
 
 
 def recognize_live(camera_index: int = 0, threshold: float = 70.0) -> None:
+    if threshold <= 0:
+        raise ValueError("--threshold must be greater than 0.")
     if not MODEL_FILE.exists():
         raise RuntimeError(f"Model file not found: {MODEL_FILE}. Run train_model.py first.")
     if not LABELS_FILE.exists():
@@ -30,6 +32,9 @@ def recognize_live(camera_index: int = 0, threshold: float = 70.0) -> None:
     face_cascade = cv2.CascadeClassifier(str(HAAR_CASCADE_FILE))
     if face_cascade.empty():
         raise RuntimeError(f"Could not load Haar cascade from {HAAR_CASCADE_FILE}")
+
+    if not hasattr(cv2, "face"):
+        raise RuntimeError("OpenCV face module is missing. Install opencv-contrib-python.")
 
     recognizer = cv2.face.LBPHFaceRecognizer_create()
     recognizer.read(str(MODEL_FILE))
@@ -77,6 +82,16 @@ def recognize_live(camera_index: int = 0, threshold: float = 70.0) -> None:
                 box_color,
                 2,
             )
+
+        cv2.putText(
+            frame,
+            f"Threshold: {threshold:.1f} | Press Q to quit",
+            (10, 30),
+            cv2.FONT_HERSHEY_SIMPLEX,
+            0.7,
+            (255, 255, 0),
+            2,
+        )
 
         cv2.imshow("Live Face Recognition", frame)
         if cv2.waitKey(1) & 0xFF == ord("q"):
